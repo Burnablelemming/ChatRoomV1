@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "winsock2.h"
 
-#define SERVER_PORT   9999
+#define SERVER_PORT   11972
 #define MAX_PENDING   5
 #define MAX_LINE      256
 
