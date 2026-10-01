@@ -3,5 +3,5 @@ enum Commands {
 	CMD_LOGOUT,
 	CMD_SEND_MESSAGE,
 	CMD_CREATE_USER,
-	CMD_START
+	CMD_NONE
 };
