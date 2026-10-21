@@ -10,8 +10,13 @@
 #define MAX_LINE      256
 
 
-
 using namespace std;
+
+// This struct represents the state of a client session, including whether the user is logged in and their username.
+struct ClientSession {
+	bool loggedIn = false;
+	string username = "";
+};
 
 // ================ Helper Functions ================
 void parseClientInput(char* buf, Commands* cmd, string* message) {
@@ -36,6 +41,19 @@ void parseClientInput(char* buf, Commands* cmd, string* message) {
 	else {
 		*cmd = CMD_NONE;
 	}
+}
+
+bool isCommandAllowed(Commands cmd, const ClientSession& session) {
+
+	if (cmd == CMD_NONE) {
+		return false;
+	}
+
+	if (session.loggedIn) {
+		return cmd == CMD_SEND_MESSAGE || cmd == CMD_LOGOUT;
+	}
+
+	return cmd == CMD_LOGIN || cmd == CMD_CREATE_USER;
 }
 
 void main(int argc, char** argv) {
@@ -91,9 +109,10 @@ void main(int argc, char** argv) {
 	}
 
 	// Send and receive data.
+	ClientSession session;
 	Commands cmd = CMD_NONE;
 	printf("My chat room client. Version One.\n\n");
-	while (cmd != CMD_LOGOUT) {
+	while (true) {
 		// Prompt the user for input
 		char buf[MAX_LINE];
 		printf("Enter command: ");
@@ -102,15 +121,35 @@ void main(int argc, char** argv) {
 		}
 
 		string message;
+
+		// Parse the user input into a command and message
 		parseClientInput(buf, &cmd, &message);
+
+		if (cmd == CMD_NONE) {
+			printf("Unknown command. Please try again.\n");
+			continue;
+		}
+
+		// Check if the command is allowed based on the current session state
+		if (!isCommandAllowed(cmd, session)) {
+			if (!session.loggedIn) {
+				printf("Denied. Please login first.\n");
+			}
+			else {
+				printf("Denied. Already logged in.\n");
+			}
+			continue;
+		}
 
 		switch (cmd) {
 			case CMD_LOGIN:
 				printf("Logging in with message: %s\n", message.c_str());
+				session.loggedIn = true;
 				// login(message);
 				continue;
 			case CMD_LOGOUT:
 				printf("Logging out.\n");
+				session.loggedIn = false;
 				closesocket(s);
 				WSACleanup();
 				return;
