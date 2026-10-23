@@ -4,10 +4,18 @@
 #include <string>
 #include <iostream>
 #include "winsock2.h"
-#include "client_commands.cpp"
+#include "../protocol.h"
 
+// Define constants for server connection and buffer sizes
 #define SERVER_PORT  11972
 #define MAX_LINE      256
+#define MAX_RESPONSE  512
+
+// Define constants for username and password length constraints
+#define MAX_USERNAME_LENGTH 32
+#define MIN_USERNAME_LENGTH 3
+#define MAX_PASSWORD_LENGTH 8
+#define MIN_PASSWORD_LENGTH 4
 
 
 using namespace std;
@@ -16,12 +24,6 @@ using namespace std;
 struct ClientSession {
 	bool loggedIn = false;
 	string username = "";
-};
-
-// This struct represents the message sent from the client to the server, including the command and any associated payload.
-struct ClientRequest {
-	Commands command = CMD_NONE;
-	string payload = "";
 };
 
 // ================ Helper Functions ================
@@ -49,11 +51,12 @@ ClientRequest parseClientInput(const string& input) {
 		request.command = CMD_NONE;
 	}
 
-	getline(ss >> ws, request.payload);
+	getline(ss >> ws, request.body);
 
 	return request;
 }
 
+// This function checks if a given command is allowed based on the current session state (logged in or not).
 bool isCommandAllowed(Commands cmd, const ClientSession& session) {
 
 	if (cmd == CMD_NONE) {
@@ -65,6 +68,195 @@ bool isCommandAllowed(Commands cmd, const ClientSession& session) {
 	}
 
 	return cmd == CMD_LOGIN || cmd == CMD_CREATE_USER;
+}
+
+// This function handles the login command by validating the username and password format and length.
+bool validateLogin(const ClientRequest& request) {
+	stringstream ss(request.body);
+
+	string username;
+	string password;
+	string extra;
+
+	// Extract username and password
+	if (!(ss >> username >> password)) {
+		printf("Invalid login format. Usage: login UserID Password\n");
+		return false;
+	}
+
+	// Check for additional arguments
+	if (ss >> extra) {
+		printf("Invalid login format. Too many arguments.\n");
+		return false;
+	}
+
+	// Validate username length
+	if (username.length() < MIN_USERNAME_LENGTH || username.length() > MAX_USERNAME_LENGTH) {
+		printf("Invalid username. Must be 3-32 characters.\n");
+		return false;
+	}
+
+	// Validate password length
+	if (password.length() < MIN_PASSWORD_LENGTH || password.length() > MAX_PASSWORD_LENGTH) {
+		printf("Invalid password. Must be 4-8 characters.\n");
+		return false;
+	}
+
+	return true;
+}
+
+// This function serializes a ClientRequest into a string format suitable for sending to the server.
+string serializeRequest(const ClientRequest& request) {
+	string command;
+
+	switch (request.command) {
+	case CMD_LOGIN:
+		command = "LOGIN";
+		break;
+
+	case CMD_LOGOUT:
+		command = "LOGOUT";
+		break;
+
+	case CMD_SEND_MESSAGE:
+		command = "SEND";
+		break;
+
+	case CMD_CREATE_USER:
+		command = "NEWUSER";
+		break;
+
+	default:
+		return "";
+	}
+
+	return command + "|" + request.body + "\n";
+}
+
+// This function sends a serialized ClientRequest to the server over a given socket, ensuring that all bytes are sent.
+bool sendRequest(SOCKET socket, const ClientRequest& request) {
+	string data = serializeRequest(request);
+
+	// Check for invalid serialization
+	if (data.empty()) {
+		printf("Error: Invalid request.\n");
+		return false;
+	}
+
+	int totalSent = 0;
+	int dataLength = static_cast<int>(data.length());
+
+	// Continue until all bytes have been sent
+	while (totalSent < dataLength) {
+		int bytesSent = send(socket, data.c_str() + totalSent, dataLength - totalSent, 0);
+
+		if (bytesSent == SOCKET_ERROR || bytesSent == 0) {
+			printf("Error sending request: %d\n", WSAGetLastError());
+			return false;
+		}
+
+		totalSent += bytesSent;
+	}
+
+	return true;
+}
+
+// This function receives a response from the server over a given socket, reading until a newline character is encountered.
+bool receiveResponse(SOCKET socket, string& response) {
+	response.clear();
+
+	char ch;
+
+	while (true) {
+		int bytesReceived = recv(socket, &ch, 1, 0);
+
+		if (bytesReceived == SOCKET_ERROR) {
+			printf("Error receiving response: %d\n", WSAGetLastError());
+			return false;
+		}
+
+		if (bytesReceived == 0) {
+			printf("Server disconnected.\n");
+			return false;
+		}
+
+		// End of response
+		if (ch == '\n') {
+			return true;
+		}
+
+		response += ch;
+
+		if (response.length() > MAX_RESPONSE) {
+			printf("Error: Server response too long.\n");
+			return false;
+		}
+	}
+}
+
+// This function parses a raw server response string into a ServerResponse struct, extracting the status code and message.
+ServerResponse parseServerResponse(const string& rawResponse) {
+	ServerResponse response;
+
+	size_t delimiter = rawResponse.find('|');
+
+	if (delimiter == string::npos) {
+		response.message = "Invalid server response.";
+		return response;
+	}
+
+	string status = rawResponse.substr(0, delimiter);
+	response.message = rawResponse.substr(delimiter + 1);
+
+	try {
+		size_t parsedLength = 0;
+		int code = stoi(status, &parsedLength);
+
+		if (parsedLength != status.length() || status.length() != 3 || code < 100 || code > 599) {
+			response.message = "Invalid server response.";
+			return response;
+		}
+
+		response.statusCode = static_cast<StatusCode>(code);
+	}
+	catch (const std::exception&) {
+		response.message = "Invalid server response.";
+	}
+
+	return response;
+}
+
+// This function parses a raw server response string into a ServerResponse struct, extracting the status code and message.
+bool handleLogin(SOCKET socket, const ClientRequest& request, ClientSession& session) {
+
+	if (!validateLogin(request)) {
+		return true;
+	}
+
+	// Return false to terminate connection only if server operations fail.
+	if (!sendRequest(socket, request)) {
+		return false;
+	}
+
+	string rawResponse;
+
+	// Same here, return false to terminate connection only if server operations fail.
+	if (!receiveResponse(socket, rawResponse)) {
+		return false;
+	}
+
+	ServerResponse response = parseServerResponse(rawResponse);
+
+	printf("%s\n", response.message.c_str());
+
+	if (response.statusCode == STATUS_OK) {
+		stringstream ss(request.body);
+		ss >> session.username;
+
+		session.loggedIn = true;
+	}
+
+	return true;
 }
 
 void main(int argc, char** argv) {
@@ -123,7 +315,10 @@ void main(int argc, char** argv) {
 	ClientSession session;
 	
 	printf("My chat room client. Version One.\n\n");
-	while (true) {
+
+	bool connectionActive = true;
+
+	while (connectionActive) {
 		// Prompt the user for input
 		char buf[MAX_LINE];
 		printf("Enter command: ");
@@ -154,24 +349,33 @@ void main(int argc, char** argv) {
 		}
 
 		switch (request.command) {
-		case CMD_LOGIN:
-			printf("Logging in with: %s\n", request.payload.c_str());
-			break;
+			case CMD_LOGIN:
 
-		case CMD_LOGOUT:
-			printf("Logging out.\n");
-			break;
+				// If any server side errors occur during login, we terminate the connection
+				if (!handleLogin(s, request, session)) {
+					connectionActive = false;
+				}
 
-		case CMD_SEND_MESSAGE:
-			printf("Sending message: %s\n", request.payload.c_str());
-			break;
+				// Next: receive server response
+				break;
 
-		case CMD_CREATE_USER:
-			printf("Creating user: %s\n", request.payload.c_str());
-			break;
+			case CMD_LOGOUT:
+				printf("Logging out.\n");
+				//handleLogout(s, request, session);
+				break;
 
-		default:
-			break;
+			case CMD_SEND_MESSAGE:
+				printf("Sending message: %s\n", request.body.c_str());
+				//handleSendMessage(s, request, session);
+				break;
+
+			case CMD_CREATE_USER:
+				printf("Creating user: %s\n", request.body.c_str());
+				//handleCreateUser(s, request, session);
+				break;
+
+			default:
+				break;
 		}
 
 		send(s, message.c_str(), strlen(message.c_str()), 0);
