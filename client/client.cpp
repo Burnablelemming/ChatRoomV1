@@ -18,29 +18,40 @@ struct ClientSession {
 	string username = "";
 };
 
+// This struct represents the message sent from the client to the server, including the command and any associated payload.
+struct ClientRequest {
+	Commands command = CMD_NONE;
+	string payload = "";
+};
+
 // ================ Helper Functions ================
-void parseClientInput(char* buf, Commands* cmd, string* message) {
-	stringstream ss(buf);
+ClientRequest parseClientInput(const string& input) {
+	stringstream ss(input);
 	string command;
+
+	ClientRequest request;
+
 	ss >> command;
+
 	if (command == "login") {
-		*cmd = CMD_LOGIN;
-		getline(ss >> ws, *message);
+		request.command = CMD_LOGIN;
 	}
 	else if (command == "logout") {
-		*cmd = CMD_LOGOUT;
+		request.command = CMD_LOGOUT;
 	}
 	else if (command == "send") {
-		*cmd = CMD_SEND_MESSAGE;
-		getline(ss >> ws, *message);
+		request.command = CMD_SEND_MESSAGE;
 	}
 	else if (command == "newuser") {
-		*cmd = CMD_CREATE_USER;
-		getline(ss >> ws, *message);
+		request.command = CMD_CREATE_USER;
 	}
 	else {
-		*cmd = CMD_NONE;
+		request.command = CMD_NONE;
 	}
+
+	getline(ss >> ws, request.payload);
+
+	return request;
 }
 
 bool isCommandAllowed(Commands cmd, const ClientSession& session) {
@@ -110,7 +121,7 @@ void main(int argc, char** argv) {
 
 	// Send and receive data.
 	ClientSession session;
-	Commands cmd = CMD_NONE;
+	
 	printf("My chat room client. Version One.\n\n");
 	while (true) {
 		// Prompt the user for input
@@ -122,16 +133,17 @@ void main(int argc, char** argv) {
 
 		string message;
 
-		// Parse the user input into a command and message
-		parseClientInput(buf, &cmd, &message);
+		// Parse the user input into a clientRequest struct
+		ClientRequest request = parseClientInput(buf);
 
-		if (cmd == CMD_NONE) {
+		
+		if (request.command == CMD_NONE) {
 			printf("Unknown command. Please try again.\n");
 			continue;
 		}
 
 		// Check if the command is allowed based on the current session state
-		if (!isCommandAllowed(cmd, session)) {
+		if (!isCommandAllowed(request.command, session)) {
 			if (!session.loggedIn) {
 				printf("Denied. Please login first.\n");
 			}
@@ -141,29 +153,25 @@ void main(int argc, char** argv) {
 			continue;
 		}
 
-		switch (cmd) {
-			case CMD_LOGIN:
-				printf("Logging in with message: %s\n", message.c_str());
-				session.loggedIn = true;
-				// login(message);
-				continue;
-			case CMD_LOGOUT:
-				printf("Logging out.\n");
-				session.loggedIn = false;
-				closesocket(s);
-				WSACleanup();
-				return;
-			case CMD_SEND_MESSAGE:
-				printf("Sending message: %s\n", message.c_str());
-				//sendMessage(message);
-				break;
-			case CMD_CREATE_USER:
-				printf("Creating user with message: %s\n", message.c_str());
-				//createUser(message)
-				continue;
-			default:
-				printf("Unknown command. Please try again.\n");
-				continue;
+		switch (request.command) {
+		case CMD_LOGIN:
+			printf("Logging in with: %s\n", request.payload.c_str());
+			break;
+
+		case CMD_LOGOUT:
+			printf("Logging out.\n");
+			break;
+
+		case CMD_SEND_MESSAGE:
+			printf("Sending message: %s\n", request.payload.c_str());
+			break;
+
+		case CMD_CREATE_USER:
+			printf("Creating user: %s\n", request.payload.c_str());
+			break;
+
+		default:
+			break;
 		}
 
 		send(s, message.c_str(), strlen(message.c_str()), 0);
