@@ -194,7 +194,6 @@ bool userExists(const string& username) {
 // ================ Command Handlers ================
 
 // Handle login requests.
-// TODO: Authenticate credentials against users.txt.
 ServerResponse handleLogin(const ClientRequest& request, ServerSession& session) {
     stringstream ss(request.body);
 
@@ -251,14 +250,18 @@ ServerResponse handleCreateUser(const ClientRequest& request, ServerSession&) {
         return {STATUS_INTERNAL_ERROR, "Failed to save new user."};
     }
 
-    printf("New user created: %s\n", username.c_str());
+    printf("New user account created\n");
 
     return {STATUS_CREATED, "New user account created. Please login."};
 }
 
 // Placeholder for sending chat messages.
 ServerResponse handleSendMessage(const ClientRequest& request, ServerSession& session) {
-    return {STATUS_BAD_REQUEST, "Send message not implemented yet."};
+    string message = session.username + ": " + request.body;
+
+    printf("%s\n", message.c_str());
+
+    return {STATUS_OK, message};
 }
 
 // Placeholder for logout.
@@ -269,13 +272,14 @@ ServerResponse handleLogout(const ClientRequest& request, ServerSession& session
             "Logout does not accept arguments."
         };
     }
+    string username = session.username;
 
-    printf("%s logged out.\n", session.username.c_str());
+    printf("%s logout\n", username.c_str());
 
     session.loggedIn = false;
     session.username = "";
 
-    return {STATUS_OK, "Logout confirmed."};
+    return {STATUS_OK, username + " left."};
 }
 
 // ================ Request Router ================
@@ -395,9 +399,6 @@ int main() {
         }
 
         closesocket(s);
-
-        printf("Client Closed.\n");
-        printf("Waiting for a client to connect...\n");
     }
 
     closesocket(listenSocket);

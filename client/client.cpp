@@ -8,7 +8,7 @@
 
 // Define constants for server connection and buffer sizes
 #define SERVER_PORT  11972
-#define MAX_LINE      256
+#define MAX_LINE      512
 #define MAX_RESPONSE  512
 
 // Define constants for username and password length constraints
@@ -286,6 +286,65 @@ bool handleCreateUser(SOCKET socket, const ClientRequest& request) {
 	return true;
 }
 
+// This function handles the send command by validating the message length, sending the request to the server, and processing the response.
+bool handleSendMessage(SOCKET socket, const ClientRequest& request) {
+
+	// Validate message length.
+	if (request.body.empty() || request.body.length() > 256) {
+		printf("Message must be between 1 and 256 characters.\n");
+		return true;
+	}
+
+	// Send request to server.
+	if (!sendRequest(socket, request)) {
+		return false;
+	}
+
+	// Receive response.
+	string rawResponse;
+
+	if (!receiveResponse(socket, rawResponse)) {
+		return false;
+	}
+
+	// Parse response.
+	ServerResponse response = parseServerResponse(rawResponse);
+
+	printf("%s\n", response.message.c_str());
+
+	return true;
+}
+
+// This function handles the logout command by sending the request to the server, processing the response, and resetting the client session state if successful.
+bool handleLogout(SOCKET socket, const ClientRequest& request,
+	ClientSession& session) {
+
+	// Send logout request.
+	if (!sendRequest(socket, request)) {
+		return false;
+	}
+
+	// Receive server response.
+	string rawResponse;
+
+	if (!receiveResponse(socket, rawResponse)) {
+		return false;
+	}
+
+	// Parse response.
+	ServerResponse response = parseServerResponse(rawResponse);
+
+	printf("%s\n", response.message.c_str());
+
+	// Reset the client session after successful logout.
+	if (response.statusCode == STATUS_OK) {
+		session.loggedIn = false;
+		session.username = "";
+	}
+
+	return true;
+}
+
 void main(int argc, char** argv) {
 
 	if (argc < 2) {
@@ -377,24 +436,24 @@ void main(int argc, char** argv) {
 
 		switch (request.command) {
 			case CMD_LOGIN:
-
-				// If any server side errors occur during login, we terminate the connection
 				if (!handleLogin(s, request, session)) {
 					connectionActive = false;
 				}
 				break;
 
 			case CMD_LOGOUT:
-				printf("Logging out.\n");
-				session.loggedIn = false;
-				session.username = "";
-				connectionActive = false;
-				//handleLogout(s, request, session);
+				if (!handleLogout(s, request, session)) {
+					connectionActive = false;
+				}
+				else if (!session.loggedIn) {
+					connectionActive = false;
+				}
 				break;
 
 			case CMD_SEND_MESSAGE:
-				printf("Sending message: %s\n", request.body.c_str());
-				//handleSendMessage(s, request, session);
+				if (!handleSendMessage(s, request)) {
+					connectionActive = false;
+				}
 				break;
 
 			case CMD_CREATE_USER:
