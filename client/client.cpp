@@ -255,7 +255,6 @@ bool handleLogin(SOCKET socket, const ClientRequest& request, ClientSession& ses
 
 		session.loggedIn = true;
 	}
-
 	return true;
 }
 
@@ -355,12 +354,13 @@ void main(int argc, char** argv) {
 				if (!handleLogin(s, request, session)) {
 					connectionActive = false;
 				}
-
-				// Next: receive server response
 				break;
 
 			case CMD_LOGOUT:
 				printf("Logging out.\n");
+				session.loggedIn = false;
+				session.username = "";
+				connectionActive = false;
 				//handleLogout(s, request, session);
 				break;
 
@@ -377,11 +377,7 @@ void main(int argc, char** argv) {
 			default:
 				break;
 		}
-
-		send(s, message.c_str(), strlen(message.c_str()), 0);
-		int len = recv(s, buf, MAX_LINE, 0);
-		buf[len] = 0;
-		printf("Server says: %s\n", buf);
 	}
 	closesocket(s);
+	WSACleanup();
 }
