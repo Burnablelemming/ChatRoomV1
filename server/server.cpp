@@ -12,6 +12,8 @@
 
 using namespace std;
 
+const string USERS_FILE = "../users.txt";
+
 // ================ Server Session ================
 
 struct ServerSession {
@@ -124,7 +126,7 @@ bool sendResponse(SOCKET socket, const ServerResponse& response) {
 
 // Validate login credentials against a simple users.txt file.
 bool authenticateUser(const string& username, const string& password) {
-    ifstream file("../users.txt");
+    ifstream file(USERS_FILE);
 
     if (!file.is_open()) {
         printf("Error: Could not open users.txt\n");
@@ -161,6 +163,34 @@ bool authenticateUser(const string& username, const string& password) {
     return false;
 }
 
+// Check if a username already exists in users.txt.
+bool userExists(const string& username) {
+    ifstream file(USERS_FILE);
+
+    if (!file.is_open()) {
+        printf("Error: Could not open users.txt\n");
+        return false;
+    }
+
+    string line;
+
+    while (getline(file, line)) {
+        size_t comma = line.find(',');
+
+        if (comma == string::npos) {
+            continue;
+        }
+
+        string storedUsername = line.substr(1, comma - 1);
+
+        if (storedUsername == username) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 // ================ Command Handlers ================
 
 // Handle login requests.
@@ -178,7 +208,7 @@ ServerResponse handleLogin(const ClientRequest& request, ServerSession& session)
     }
 
 	if (!authenticateUser(username, password)) {
-		return { STATUS_UNAUTHORIZED, "Invalid username or password." };
+		return { STATUS_UNAUTHORIZED, "Denied. User name or password incorrect." };
 	}
 
     session.loggedIn = true;
@@ -191,7 +221,39 @@ ServerResponse handleLogin(const ClientRequest& request, ServerSession& session)
 
 // Placeholder for account creation.
 ServerResponse handleCreateUser(const ClientRequest& request, ServerSession&) {
-    return {STATUS_BAD_REQUEST, "Create user not implemented yet."};
+    stringstream ss(request.body);
+
+    string username;
+    string password;
+    string extra;
+
+    // Basic format check.
+    if (!(ss >> username >> password) || (ss >> extra)) {
+        return {STATUS_BAD_REQUEST, "Invalid newuser format."};
+    }
+
+    // Check for duplicate usernames.
+    if (userExists(username)) {
+        return {STATUS_CONFLICT, "Denied. User account already exists"};
+    }
+
+    // Append the new user.
+    ofstream output(USERS_FILE, ios::app);
+
+    if (!output.is_open()) {
+        return {STATUS_INTERNAL_ERROR, "Unable to write to users file."};
+    }
+
+    output << "(" << username << ", " << password << ")\n";
+    output.close();
+
+    if (!output) {
+        return {STATUS_INTERNAL_ERROR, "Failed to save new user."};
+    }
+
+    printf("New user created: %s\n", username.c_str());
+
+    return {STATUS_CREATED, "New user account created. Please login."};
 }
 
 // Placeholder for sending chat messages.
@@ -288,7 +350,7 @@ int main() {
         return 1;
     }
 
-    printf("Waiting for a client to connect...\n");
+    printf("My chat room server. Version One.\n\n");
    
     // Accept and process one connected client at a time.
     while (true) {
@@ -300,7 +362,7 @@ int main() {
             break;
         }
 
-        printf("Client Connected.\n");
+        //printf("Client Connected.\n");
 
         // Each connection receives its own server-side session.
         ServerSession session;

@@ -71,7 +71,7 @@ bool isCommandAllowed(Commands cmd, const ClientSession& session) {
 }
 
 // This function handles the login command by validating the username and password format and length.
-bool validateLogin(const ClientRequest& request) {
+bool validateCredentials(const ClientRequest& request) {
 	stringstream ss(request.body);
 
 	string username;
@@ -229,7 +229,7 @@ ServerResponse parseServerResponse(const string& rawResponse) {
 // This function parses a raw server response string into a ServerResponse struct, extracting the status code and message.
 bool handleLogin(SOCKET socket, const ClientRequest& request, ClientSession& session) {
 
-	if (!validateLogin(request)) {
+	if (!validateCredentials(request)) {
 		return true;
 	}
 
@@ -255,6 +255,34 @@ bool handleLogin(SOCKET socket, const ClientRequest& request, ClientSession& ses
 
 		session.loggedIn = true;
 	}
+	return true;
+}
+
+// This function handles the newuser command by validating the username and password format, sending the request to the server, and processing the response.
+bool handleCreateUser(SOCKET socket, const ClientRequest& request) {
+
+	// Validate the username and password format.
+	if (!validateCredentials(request)) {
+		return true;
+	}
+
+	// Send the request to the server.
+	if (!sendRequest(socket, request)) {
+		return false;
+	}
+
+	// Receive the server's response.
+	string rawResponse;
+
+	if (!receiveResponse(socket, rawResponse)) {
+		return false;
+	}
+
+	// Parse and display the response.
+	ServerResponse response = parseServerResponse(rawResponse);
+
+	printf("%s\n", response.message.c_str());
+
 	return true;
 }
 
@@ -320,7 +348,7 @@ void main(int argc, char** argv) {
 	while (connectionActive) {
 		// Prompt the user for input
 		char buf[MAX_LINE];
-		printf("Enter command: ");
+		
 		if (!fgets(buf, sizeof(buf), stdin)) {
 			printf("Error reading input. Please try again.\n");
 		}
@@ -370,8 +398,9 @@ void main(int argc, char** argv) {
 				break;
 
 			case CMD_CREATE_USER:
-				printf("Creating user: %s\n", request.body.c_str());
-				//handleCreateUser(s, request, session);
+				if (!handleCreateUser(s, request)) {
+					connectionActive = false;
+				}
 				break;
 
 			default:
