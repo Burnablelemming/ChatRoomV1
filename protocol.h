@@ -1,4 +1,15 @@
-// This header file defines the protocol for communication between the chat client and server, including command types, status codes, and request/response structures.
+/*
+* Name: Carl Carver
+* Student ID: 14451972
+* Course: CS 4850 - Computer Networks I
+* Date: October 23, 2026
+* Project: ChatRoom Version 1
+* File: client.cpp
+*
+*/
+
+// This header file defines the protocol for communication between the chat client and server, 
+// including command types, status codes, and request/response structures.
 
 #pragma once
 

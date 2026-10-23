@@ -1,3 +1,12 @@
+/*
+* Name: Carl Carver
+* Student ID: [Your Student Number]
+* Course: CS 4850 - Computer Networks I
+* Date: October 23, 2026
+* Project: ChatRoom Version 1
+* File: client.cpp
+*
+*/
 #include <stdio.h>
 #include <sstream>
 #include <string>
@@ -218,7 +227,7 @@ ServerResponse handleLogin(const ClientRequest& request, ServerSession& session)
     return {STATUS_OK, "login confirmed"};
 }
 
-
+// This function handles the newuser command by validating the username and password format, checking for duplicates, and appending the new user to users.txt.
 ServerResponse handleCreateUser(const ClientRequest& request, ServerSession&) {
     stringstream ss(request.body);
 
@@ -255,7 +264,7 @@ ServerResponse handleCreateUser(const ClientRequest& request, ServerSession&) {
     return {STATUS_CREATED, "New user account created. Please login."};
 }
 
-
+// This function handles the send command by validating the message length, formatting it, and printing it to the server console.
 ServerResponse handleSendMessage(const ClientRequest& request, ServerSession& session) {
     string message = session.username + ": " + request.body;
 
@@ -264,7 +273,7 @@ ServerResponse handleSendMessage(const ClientRequest& request, ServerSession& se
     return {STATUS_OK, message};
 }
 
-// Placeholder for logout.
+// This function handles the logout command by validating that no arguments are provided, resetting the session state, and returning a confirmation message.
 ServerResponse handleLogout(const ClientRequest& request, ServerSession& session) {
     if (!request.body.empty()) {
         return {

@@ -1,3 +1,13 @@
+/*
+* Name: Carl Carver
+* Student ID: 14451972
+* Course: CS 4850 - Computer Networks I
+* Date: October 23, 2026
+* Project: ChatRoom Version 1
+* File: client.cpp
+*
+*/
+
 #include <stdio.h>
 #include <vector>
 #include <sstream>
@@ -27,6 +37,7 @@ struct ClientSession {
 };
 
 // ================ Helper Functions ================
+// This function parses a raw input string from the client into a ClientRequest struct, extracting the command and body.
 ClientRequest parseClientInput(const string& input) {
 	stringstream ss(input);
 	string command;
@@ -212,6 +223,7 @@ ServerResponse parseServerResponse(const string& rawResponse) {
 		size_t parsedLength = 0;
 		int code = stoi(status, &parsedLength);
 
+		// Make sure the status code is valid and the entire string was parsed
 		if (parsedLength != status.length() || status.length() != 3 || code < 100 || code > 599) {
 			response.message = "Invalid server response.";
 			return response;
@@ -226,7 +238,9 @@ ServerResponse parseServerResponse(const string& rawResponse) {
 	return response;
 }
 
-// This function parses a raw server response string into a ServerResponse struct, extracting the status code and message.
+// ================ Command Handlers ================
+
+// This function handles the login command by validating credentials, sending the request to the server, and processing the response.
 bool handleLogin(SOCKET socket, const ClientRequest& request, ClientSession& session) {
 
 	if (!validateCredentials(request)) {
@@ -344,6 +358,8 @@ bool handleLogout(SOCKET socket, const ClientRequest& request, ClientSession& se
 	return true;
 }
 
+// ================ Main ================
+
 void main(int argc, char** argv) {
 
 	if (argc < 2) {
@@ -434,6 +450,7 @@ void main(int argc, char** argv) {
 			continue;
 		}
 
+		// Route the command to the appropriate handler function
 		switch (request.command) {
 			case CMD_LOGIN:
 				if (!handleLogin(s, request, session)) {
