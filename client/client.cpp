@@ -316,8 +316,7 @@ bool handleSendMessage(SOCKET socket, const ClientRequest& request) {
 }
 
 // This function handles the logout command by sending the request to the server, processing the response, and resetting the client session state if successful.
-bool handleLogout(SOCKET socket, const ClientRequest& request,
-	ClientSession& session) {
+bool handleLogout(SOCKET socket, const ClientRequest& request, ClientSession& session) {
 
 	// Send logout request.
 	if (!sendRequest(socket, request)) {
@@ -409,7 +408,8 @@ void main(int argc, char** argv) {
 		char buf[MAX_LINE];
 		
 		if (!fgets(buf, sizeof(buf), stdin)) {
-			printf("Error reading input. Please try again.\n");
+			printf("Error reading input.\n");
+			break;
 		}
 
 		string message;

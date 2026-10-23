@@ -218,7 +218,7 @@ ServerResponse handleLogin(const ClientRequest& request, ServerSession& session)
     return {STATUS_OK, "login confirmed"};
 }
 
-// Placeholder for account creation.
+
 ServerResponse handleCreateUser(const ClientRequest& request, ServerSession&) {
     stringstream ss(request.body);
 
@@ -233,7 +233,7 @@ ServerResponse handleCreateUser(const ClientRequest& request, ServerSession&) {
 
     // Check for duplicate usernames.
     if (userExists(username)) {
-        return {STATUS_CONFLICT, "Denied. User account already exists"};
+        return {STATUS_CONFLICT, "Denied. User account already exists."};
     }
 
     // Append the new user.
@@ -255,7 +255,7 @@ ServerResponse handleCreateUser(const ClientRequest& request, ServerSession&) {
     return {STATUS_CREATED, "New user account created. Please login."};
 }
 
-// Placeholder for sending chat messages.
+
 ServerResponse handleSendMessage(const ClientRequest& request, ServerSession& session) {
     string message = session.username + ": " + request.body;
 
